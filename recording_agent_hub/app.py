@@ -6,7 +6,6 @@ import hashlib
 import json
 import os
 import shlex
-import shutil
 import signal
 import sqlite3
 import subprocess
@@ -22,6 +21,8 @@ from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional
 from urllib.parse import urlparse
 from urllib.request import Request, urlopen
+
+from .runner_common import find_local_cli
 
 VIDEO_EXTENSIONS = {".mp4", ".mov", ".mkv", ".flv", ".ts", ".m4v"}
 APP_DIR = Path.home() / ".recording-agent-hub"
@@ -39,12 +40,28 @@ def bundled_command(module: str) -> List[str]:
     return [sys.executable, "-m", module]
 
 
+def shell_join(command: List[str]) -> str:
+    """Quote a command for the current platform's default command processor."""
+    if sys.platform == "win32":
+        return subprocess.list2cmdline(command)
+    return shlex.join(command)
+
+
 def streamcap_hook_command(server: str = "http://127.0.0.1:8787", profile: str = "default") -> str:
-    """Use Launch Services in the packaged app so StreamCap commands are portable across Macs."""
+    """Build the post-recording command for the current packaged application."""
     runner = ["--runner", "recording_agent_hub.streamcap_hook", "--server", server, "--profile", profile]
     if getattr(sys, "frozen", False):
-        return shlex.join(["/usr/bin/open", "-n", "-b", "com.recordingagenthub.desktop", "--args", *runner])
-    return shlex.join([*bundled_command("recording_agent_hub.streamcap_hook"), "--server", server, "--profile", profile])
+        if sys.platform == "darwin":
+            return shlex.join(["/usr/bin/open", "-n", "-b", "com.recordingagenthub.desktop", "--args", *runner])
+        return shell_join([sys.executable, *runner])
+    return shell_join([*bundled_command("recording_agent_hub.streamcap_hook"), "--server", server, "--profile", profile])
+
+
+def process_group_options() -> Dict[str, Any]:
+    """Start each agent in a group that can be cancelled with its children."""
+    if sys.platform == "win32":
+        return {"creationflags": getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0x00000200)}
+    return {"start_new_session": True}
 
 
 def utc_now() -> str:
@@ -256,9 +273,7 @@ def probe_video(path: Path) -> Dict[str, Any]:
         raise ValueError(f"Unsupported video type: {path.suffix}")
     if not path.is_file():
         raise FileNotFoundError(path)
-    command = [
-        "ffprobe", "-v", "error", "-show_entries", "format=duration,size", "-of", "json", str(path),
-    ]
+    command = [find_local_cli("ffprobe") or "ffprobe", "-v", "error", "-show_entries", "format=duration,size", "-of", "json", str(path)]
     result = subprocess.run(command, capture_output=True, text=True, check=False, timeout=30)
     if result.returncode:
         raise RuntimeError(f"ffprobe rejected {path}: {result.stderr.strip()}")
@@ -272,14 +287,7 @@ def probe_video(path: Path) -> Dict[str, Any]:
 
 def agent_diagnostics() -> Dict[str, Optional[str]]:
     def locate(name: str) -> Optional[str]:
-        found = shutil.which(name)
-        if found:
-            return found
-        for directory in (Path.home() / ".local" / "bin", Path("/opt/homebrew/bin"), Path("/usr/local/bin")):
-            candidate = directory / name
-            if candidate.is_file() and os.access(candidate, os.X_OK):
-                return str(candidate)
-        return None
+        return find_local_cli(name)
 
     checks: Dict[str, Optional[str]] = {
         "codex": locate("codex"),
@@ -511,6 +519,18 @@ class Hub:
             process = self._active_process
         if not process or process.poll() is not None:
             return
+        if sys.platform == "win32":
+            try:
+                subprocess.run(
+                    ["taskkill", "/PID", str(process.pid), "/T", "/F"],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    check=False,
+                    timeout=7,
+                )
+            except (OSError, subprocess.TimeoutExpired):
+                process.terminate()
+            return
         try:
             os.killpg(process.pid, signal.SIGTERM)
             process.wait(timeout=5)
@@ -673,7 +693,7 @@ class Hub:
                         stdout=output,
                         stderr=subprocess.STDOUT,
                         text=True,
-                        start_new_session=True,
+                        **process_group_options(),
                     )
                 return_code = self._active_process.wait()
                 with self._process_lock:
