@@ -4,6 +4,8 @@ import tempfile
 import threading
 import time
 import unittest
+import subprocess
+import sys
 from pathlib import Path
 from unittest import mock
 
@@ -67,6 +69,33 @@ class FileHandoffTests(unittest.TestCase):
             self.assertTrue(pending.is_file())
             self.assertFalse(list(pending_dir.glob("*.tmp")))
             self.assertIn('"profile": "default"', pending.read_text(encoding="utf-8"))
+
+
+class PlatformIntegrationTests(unittest.TestCase):
+    def test_windows_packaged_hook_uses_current_executable(self) -> None:
+        executable = r"C:\Program Files\Recording Agent Hub\RecordingAgentHub.exe"
+        with (
+            mock.patch.object(app.sys, "platform", "win32"),
+            mock.patch.object(app.sys, "executable", executable),
+            mock.patch.object(app.sys, "frozen", True, create=True),
+        ):
+            command = app.streamcap_hook_command()
+        self.assertIn(f'"{executable}"', command)
+        self.assertIn("--runner recording_agent_hub.streamcap_hook", command)
+        self.assertNotIn("/usr/bin/open", command)
+
+    def test_windows_agents_start_in_a_new_process_group(self) -> None:
+        with mock.patch.object(app.sys, "platform", "win32"):
+            options = app.process_group_options()
+        self.assertEqual(
+            options,
+            {"creationflags": getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0x00000200)},
+        )
+
+    def test_posix_agents_start_in_a_new_session(self) -> None:
+        platform = "darwin" if sys.platform == "win32" else sys.platform
+        with mock.patch.object(app.sys, "platform", platform):
+            self.assertEqual(app.process_group_options(), {"start_new_session": True})
 
 
 class JobStoreTests(unittest.TestCase):
