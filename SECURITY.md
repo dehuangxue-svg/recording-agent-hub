@@ -10,6 +10,6 @@ Do not open a public issue for a security vulnerability, credential exposure, or
 
 ## Credential handling
 
-Recording Agent Hub does not store API keys or personal access tokens in its project config, job manifests, or logs. Supply credentials using the relevant agent's own login flow, macOS Keychain, launchd environment, or another secrets manager.
+Recording Agent Hub does not store API keys or personal access tokens in its project config, job manifests, or logs. Supply credentials using the relevant agent's own login flow, an operating-system credential store, a service environment, or another secrets manager.
 
 If a token is pasted into an issue, chat, terminal history, or commit, revoke it immediately and generate a replacement.
