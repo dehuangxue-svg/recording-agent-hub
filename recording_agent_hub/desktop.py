@@ -1,6 +1,7 @@
-"""Native macOS desktop entry point for Recording Agent Hub."""
+"""Native desktop entry point for Recording Agent Hub."""
 from __future__ import annotations
 
+import os
 import socket
 import subprocess
 import sys
@@ -24,6 +25,9 @@ MUTED = "#91a09f"
 ACCENT = "#43c590"
 ACCENT_DARK = "#092319"
 DANGER = "#d96b70"
+UI_FONT = "Segoe UI" if sys.platform == "win32" else "SF Pro Text"
+DISPLAY_FONT = "Segoe UI" if sys.platform == "win32" else "SF Pro Display"
+MONO_FONT = "Consolas" if sys.platform == "win32" else "SF Mono"
 
 AGENT_LABELS = {
     "codex": "Codex CLI",
@@ -118,13 +122,13 @@ class NativeHubWindow:
         style.theme_use("clam")
         style.configure("TFrame", background=BG)
         style.configure("Surface.TFrame", background=SURFACE)
-        style.configure("TLabel", background=BG, foreground=TEXT, font=("SF Pro Text", 12))
+        style.configure("TLabel", background=BG, foreground=TEXT, font=(UI_FONT, 12))
         style.configure("Surface.TLabel", background=SURFACE, foreground=TEXT)
-        style.configure("Title.TLabel", font=("SF Pro Display", 27, "bold"), foreground=TEXT)
-        style.configure("Subtitle.TLabel", font=("SF Pro Text", 12), foreground=MUTED)
-        style.configure("Section.TLabel", font=("SF Pro Text", 17, "bold"), foreground=TEXT)
-        style.configure("Muted.TLabel", font=("SF Pro Text", 11), foreground=MUTED)
-        style.configure("Status.TLabel", background=SURFACE, foreground=ACCENT, font=("SF Pro Text", 12, "bold"))
+        style.configure("Title.TLabel", font=(DISPLAY_FONT, 27, "bold"), foreground=TEXT)
+        style.configure("Subtitle.TLabel", font=(UI_FONT, 12), foreground=MUTED)
+        style.configure("Section.TLabel", font=(UI_FONT, 17, "bold"), foreground=TEXT)
+        style.configure("Muted.TLabel", font=(UI_FONT, 11), foreground=MUTED)
+        style.configure("Status.TLabel", background=SURFACE, foreground=ACCENT, font=(UI_FONT, 12, "bold"))
         style.configure(
             "TButton",
             background=SURFACE_2,
@@ -133,7 +137,7 @@ class NativeHubWindow:
             lightcolor=SURFACE_2,
             darkcolor=SURFACE_2,
             padding=(13, 8),
-            font=("SF Pro Text", 11, "bold"),
+            font=(UI_FONT, 11, "bold"),
         )
         style.map("TButton", background=[("active", "#273338"), ("pressed", "#111719")])
         style.configure(
@@ -180,7 +184,7 @@ class NativeHubWindow:
             foreground=MUTED,
             padding=(18, 10),
             borderwidth=0,
-            font=("SF Pro Text", 11, "bold"),
+            font=(UI_FONT, 11, "bold"),
         )
         style.map(
             "TNotebook.Tab",
@@ -194,7 +198,7 @@ class NativeHubWindow:
             foreground=TEXT,
             bordercolor=BORDER,
             rowheight=34,
-            font=("SF Pro Text", 11),
+            font=(UI_FONT, 11),
         )
         style.map("Treeview", background=[("selected", "#245342")], foreground=[("selected", TEXT)])
         style.configure(
@@ -204,7 +208,7 @@ class NativeHubWindow:
             bordercolor=BORDER,
             relief="flat",
             padding=(8, 9),
-            font=("SF Pro Text", 10, "bold"),
+            font=(UI_FONT, 10, "bold"),
         )
         style.map("Treeview.Heading", background=[("active", "#263237")])
         style.configure("TSeparator", background=BORDER)
@@ -215,7 +219,7 @@ class NativeHubWindow:
             relief="solid",
             borderwidth=1,
         )
-        style.configure("TLabelframe.Label", background=BG, foreground=MUTED, font=("SF Pro Text", 10, "bold"))
+        style.configure("TLabelframe.Label", background=BG, foreground=MUTED, font=(UI_FONT, 10, "bold"))
 
     def build(self) -> None:
         selected_tab = self.notebook.index(self.notebook.select()) if hasattr(self, "notebook") else 0
@@ -373,7 +377,7 @@ class NativeHubWindow:
             borderwidth=0,
             padx=8,
             pady=8,
-            font=("SF Mono", 10),
+            font=(MONO_FONT, 10),
         )
         self.job_details.pack(fill="both", expand=True)
 
@@ -517,7 +521,7 @@ class NativeHubWindow:
         if field == "output_path" and not path.exists():
             path = path.parent
         if path.exists():
-            subprocess.Popen(["/usr/bin/open", str(path)])
+            open_path(path)
 
     def show_selected_job(self) -> None:
         job = self.selected_job()
@@ -665,6 +669,16 @@ def _activate_running_app() -> bool:
             return response.status == 200
     except OSError:
         return False
+
+
+def open_path(path: Path) -> None:
+    """Open a file or directory with the platform's default application."""
+    if sys.platform == "win32":
+        os.startfile(str(path))  # type: ignore[attr-defined]
+    elif sys.platform == "darwin":
+        subprocess.Popen(["/usr/bin/open", str(path)])
+    else:
+        subprocess.Popen(["xdg-open", str(path)])
 
 
 def _run_desktop() -> int:
