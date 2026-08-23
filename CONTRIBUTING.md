@@ -5,18 +5,22 @@ Thanks for improving Recording Agent Hub.
 ## Before opening a pull request
 
 1. Keep changes focused. Do not mix adapter, UI, and unrelated refactors in one pull request.
-2. Never commit a token, local config, task log, source recording, or generated `.app`/DMG.
+2. Never commit a token, local config, task log, source recording, or generated application/installer.
 3. Run the tests:
 
    ```bash
    uv run python -m unittest discover -s tests -v
    ```
 
-4. If you change the macOS desktop app, build it once:
+4. If you change the desktop app, build it on the platform you changed:
 
-   ```bash
-   ./scripts/build_macos_app.sh
-   ```
+```bash
+./scripts/build_macos_app.sh
+```
+
+```powershell
+.\scripts\build_windows.ps1
+```
 
 ## Agent adapters
 
