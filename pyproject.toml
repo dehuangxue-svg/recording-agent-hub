@@ -1,0 +1,16 @@
+[project]
+name = "recording-agent-hub"
+version = "0.3.0"
+description = "Event-driven, local-first post-recording automation hub"
+requires-python = ">=3.10"
+dependencies = ["watchdog>=4.0"]
+
+[project.optional-dependencies]
+qoder = ["qoder-agent-sdk"]
+
+[project.scripts]
+recording-agent-hub = "recording_agent_hub.app:main"
+recording-agent-hub-desktop = "recording_agent_hub.desktop:main"
+
+[tool.uv]
+package = true
