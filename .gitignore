@@ -1,0 +1,14 @@
+.venv/
+__pycache__/
+*.pyc
+.DS_Store
+.ruff_cache/
+.pytest_cache/
+*.egg-info/
+build/
+dist/
+*.spec
+.recording-agent-hub/
+.env
+.env.*
+!.env.example
